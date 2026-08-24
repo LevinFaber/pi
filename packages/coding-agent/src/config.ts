@@ -2,6 +2,7 @@ import { accessSync, constants, existsSync, readFileSync, realpathSync } from "f
 import { homedir } from "os";
 import { basename, dirname, join, resolve, sep, win32 } from "path";
 import { fileURLToPath } from "url";
+import { findGitPaths } from "./core/footer-data-provider.ts";
 import { spawnProcessSync } from "./utils/child-process.ts";
 import { normalizePath } from "./utils/paths.ts";
 import { stripBom } from "./utils/text.ts";
@@ -572,4 +573,28 @@ export function getSessionsDir(): string {
 /** Get path to debug log file */
 export function getDebugLogPath(): string {
 	return join(getAgentDir(), `${APP_NAME}-debug.log`);
+}
+
+// =============================================================================
+// Project Config Root (cwd/${CONFIG_DIR_NAME}/*)
+// =============================================================================
+
+/**
+ * Resolve the directory whose ${CONFIG_DIR_NAME} folder backs project config
+ * (settings, extensions/tools, skills, prompts, themes, trust). `cwd` wins when it
+ * has its own local folder. Otherwise, when cwd sits inside a git worktree whose
+ * root has one, that root is used instead, so project config resolves the same way
+ * regardless of which subdirectory pi runs from. Falls back to `cwd` when neither
+ * has one (unchanged behavior: no project config found).
+ */
+export function resolveProjectRoot(cwd: string): string {
+	const resolvedCwd = resolve(cwd);
+	if (existsSync(join(resolvedCwd, CONFIG_DIR_NAME))) {
+		return resolvedCwd;
+	}
+	const worktreeRoot = findGitPaths(resolvedCwd)?.repoDir;
+	if (worktreeRoot && worktreeRoot !== resolvedCwd && existsSync(join(worktreeRoot, CONFIG_DIR_NAME))) {
+		return worktreeRoot;
+	}
+	return resolvedCwd;
 }

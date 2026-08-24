@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { basename, dirname, join, resolve, sep } from "node:path";
 import chalk from "chalk";
-import { CONFIG_DIR_NAME } from "../config.ts";
+import { CONFIG_DIR_NAME, resolveProjectRoot } from "../config.ts";
 import { loadThemeFromPath, type Theme } from "../modes/interactive/theme/theme.ts";
 import type { ResourceDiagnostic } from "./diagnostics.ts";
 
@@ -195,6 +195,8 @@ export interface DefaultResourceLoaderOptions {
 
 export class DefaultResourceLoader implements ResourceLoader {
 	private cwd: string;
+	/** Directory whose ${CONFIG_DIR_NAME} folder backs project config; cwd itself, or a git worktree root fallback (see resolveProjectRoot). */
+	private projectConfigRoot: string;
 	private agentDir: string;
 	private settingsManager: SettingsManager;
 	private eventBus: EventBus;
@@ -253,6 +255,7 @@ export class DefaultResourceLoader implements ResourceLoader {
 
 	constructor(options: DefaultResourceLoaderOptions) {
 		this.cwd = resolvePath(options.cwd);
+		this.projectConfigRoot = resolveProjectRoot(this.cwd);
 		this.agentDir = resolvePath(options.agentDir);
 		this.settingsManager = options.settingsManager ?? SettingsManager.create(this.cwd, this.agentDir);
 		this.eventBus = options.eventBus ?? createEventBus();
@@ -816,10 +819,10 @@ export class DefaultResourceLoader implements ResourceLoader {
 			join(this.agentDir, "extensions"),
 		];
 		const projectRoots = [
-			join(this.cwd, CONFIG_DIR_NAME, "skills"),
-			join(this.cwd, CONFIG_DIR_NAME, "prompts"),
-			join(this.cwd, CONFIG_DIR_NAME, "themes"),
-			join(this.cwd, CONFIG_DIR_NAME, "extensions"),
+			join(this.projectConfigRoot, CONFIG_DIR_NAME, "skills"),
+			join(this.projectConfigRoot, CONFIG_DIR_NAME, "prompts"),
+			join(this.projectConfigRoot, CONFIG_DIR_NAME, "themes"),
+			join(this.projectConfigRoot, CONFIG_DIR_NAME, "extensions"),
 		];
 
 		for (const root of agentRoots) {
@@ -872,7 +875,7 @@ export class DefaultResourceLoader implements ResourceLoader {
 		const themes: Theme[] = [];
 		const diagnostics: ResourceDiagnostic[] = [];
 		if (includeDefaults) {
-			const defaultDirs = [join(this.agentDir, "themes"), join(this.cwd, CONFIG_DIR_NAME, "themes")];
+			const defaultDirs = [join(this.agentDir, "themes"), join(this.projectConfigRoot, CONFIG_DIR_NAME, "themes")];
 
 			for (const dir of defaultDirs) {
 				this.loadThemesFromDir(dir, themes, diagnostics);
@@ -1021,7 +1024,7 @@ export class DefaultResourceLoader implements ResourceLoader {
 	}
 
 	private discoverSystemPromptFile(): string | undefined {
-		const projectPath = join(this.cwd, CONFIG_DIR_NAME, "SYSTEM.md");
+		const projectPath = join(this.projectConfigRoot, CONFIG_DIR_NAME, "SYSTEM.md");
 		if (this.settingsManager.isProjectTrusted() && existsSync(projectPath)) {
 			return projectPath;
 		}
@@ -1035,7 +1038,7 @@ export class DefaultResourceLoader implements ResourceLoader {
 	}
 
 	private discoverAppendSystemPromptFile(): string | undefined {
-		const projectPath = join(this.cwd, CONFIG_DIR_NAME, "APPEND_SYSTEM.md");
+		const projectPath = join(this.projectConfigRoot, CONFIG_DIR_NAME, "APPEND_SYSTEM.md");
 		if (this.settingsManager.isProjectTrusted() && existsSync(projectPath)) {
 			return projectPath;
 		}
