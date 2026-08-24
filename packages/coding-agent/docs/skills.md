@@ -26,39 +26,31 @@ Pi loads skills from:
 - Global:
   - `~/.pi/agent/skills/`
   - `~/.agents/skills/`
+  - `~/.claude/skills/`
 - Project (only after the project is trusted):
   - `.pi/skills/`
   - `.agents/skills/` in `cwd` and ancestor directories (up to git repo root, or filesystem root when not in a repo)
+  - `.claude/skills/` in `cwd` and ancestor directories (same walk as `.agents/skills/`)
 - Packages: `skills/` directories or `pi.skills` entries in `package.json`
 - Settings: `skills` array with files or directories
 - CLI: `--skill <path>` (repeatable, additive even with `--no-skills`)
 
 Discovery rules:
+
 - In `~/.pi/agent/skills/` and `.pi/skills/`, direct root `.md` files are discovered as individual skills when they have valid skill frontmatter with a non-empty `description`
 - In all skill locations, directories containing `SKILL.md` are discovered recursively
-- In `~/.agents/skills/` and project `.agents/skills/`, root `.md` files are ignored, but nested `.md` files in grouping folders are discovered when they declare skill frontmatter
+- In `~/.agents/skills/`, project `.agents/skills/`, `~/.claude/skills/`, and project `.claude/skills/`, root `.md` files are ignored, but nested `.md` files in grouping folders are discovered when they declare skill frontmatter
 - Root Markdown files other than `SKILL.md` that do not look like skills are ignored silently
 
 Disable discovery with `--no-skills` (explicit `--skill` paths still load).
 
 ### Using Skills from Other Harnesses
 
-To use skills from Claude Code or OpenAI Codex, add their directories to settings:
+`~/.claude/skills/` and project `.claude/skills/` (Claude Code) are discovered automatically, same as `.agents/skills/`. For other harnesses, such as OpenAI Codex, add their directories to settings:
 
 ```json
 {
-  "skills": [
-    "~/.claude/skills",
-    "~/.codex/skills"
-  ]
-}
-```
-
-For project-level Claude Code skills, add to `.pi/settings.json`:
-
-```json
-{
-  "skills": ["../.claude/skills"]
+  "skills": ["~/.codex/skills"]
 }
 ```
 
@@ -140,7 +132,7 @@ See [the reference guide](references/REFERENCE.md) for details.
 Per the [Agent Skills specification](https://agentskills.io/specification#frontmatter-required):
 
 | Field | Required | Description |
-|-------|----------|-------------|
+| ------- | ---------- | ------------- |
 | `name` | Yes | Max 64 chars. Lowercase a-z, 0-9, hyphens. Unlike the standard, Pi does not require this to match the parent directory because that standard requirement is suboptimal for shared skill directories. |
 | `description` | Yes | Max 1024 chars. What the skill does and when to use it. |
 | `license` | No | License name or reference to bundled file. |
@@ -165,11 +157,13 @@ Invalid: `PDF-Processing`, `-pdf`, `pdf--processing`
 The description determines when the agent loads the skill. Be specific.
 
 Good:
+
 ```yaml
 description: Extracts text and tables from PDF files, fills PDF forms, and merges multiple PDFs. Use when working with PDF documents.
 ```
 
 Poor:
+
 ```yaml
 description: Helps with PDFs.
 ```
@@ -198,6 +192,7 @@ brave-search/
 ```
 
 **SKILL.md:**
+
 ````markdown
 ---
 name: brave-search

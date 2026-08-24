@@ -5,6 +5,7 @@
 ### Added
 
 - Added transcript usage notices for compaction and branch summaries when cache miss notices are enabled.
+- Added automatic discovery of Claude Code skills from `~/.claude/skills/` and project `.claude/skills/`, matching existing `.agents/skills/` discovery.
 
 ### Changed
 

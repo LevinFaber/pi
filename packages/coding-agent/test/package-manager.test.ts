@@ -383,6 +383,31 @@ Content`,
 			expect(resolvedPackageSkill?.metadata.scope).toBe("project");
 			expect(resolvedPackageSkill?.metadata.baseDir).toBe(packageAgentsBaseDir);
 		});
+
+		it("should use ~/.claude as baseDir for user .claude skills", async () => {
+			const previousHome = process.env.HOME;
+			process.env.HOME = tempDir;
+
+			try {
+				const claudeBaseDir = join(tempDir, ".claude");
+				const skillPath = join(claudeBaseDir, "skills", "user-claude", "SKILL.md");
+				mkdirSync(join(claudeBaseDir, "skills", "user-claude"), { recursive: true });
+				writeFileSync(skillPath, "---\nname: user-claude\ndescription: user claude\n---\n");
+
+				const result = await packageManager.resolve();
+				const skill = result.skills.find((r) => r.path === skillPath);
+
+				expect(skill?.metadata.source).toBe("auto");
+				expect(skill?.metadata.scope).toBe("user");
+				expect(skill?.metadata.baseDir).toBe(claudeBaseDir);
+			} finally {
+				if (previousHome === undefined) {
+					delete process.env.HOME;
+				} else {
+					process.env.HOME = previousHome;
+				}
+			}
+		});
 	});
 
 	describe(".agents/skills auto-discovery", () => {
@@ -531,6 +556,51 @@ Content`,
 					process.env.HOME = previousHome;
 				}
 			}
+		});
+	});
+
+	describe(".claude/skills auto-discovery", () => {
+		it("should scan .claude/skills from cwd up to git repo root, ignoring root markdown files", async () => {
+			const repoRoot = join(tempDir, "repo");
+			const nestedCwd = join(repoRoot, "packages", "feature");
+			mkdirSync(nestedCwd, { recursive: true });
+			mkdirSync(join(repoRoot, ".git"), { recursive: true });
+
+			const aboveRepoSkill = join(tempDir, ".claude", "skills", "above-repo", "SKILL.md");
+			mkdirSync(join(tempDir, ".claude", "skills", "above-repo"), { recursive: true });
+			writeFileSync(aboveRepoSkill, "---\nname: above-repo\ndescription: above\n---\n");
+
+			const repoRootSkill = join(repoRoot, ".claude", "skills", "repo-root", "SKILL.md");
+			mkdirSync(join(repoRoot, ".claude", "skills", "repo-root"), { recursive: true });
+			writeFileSync(repoRootSkill, "---\nname: repo-root\ndescription: repo\n---\n");
+
+			const rootMarkdownSkill = join(repoRoot, ".claude", "skills", "root-file.md");
+			writeFileSync(rootMarkdownSkill, "---\nname: root-file\ndescription: Root markdown file\n---\n");
+
+			const pm = new DefaultPackageManager({
+				cwd: nestedCwd,
+				agentDir,
+				settingsManager,
+			});
+
+			const result = await pm.resolve();
+			expect(result.skills.some((r) => r.path === repoRootSkill && r.enabled)).toBe(true);
+			expect(result.skills.some((r) => r.path === aboveRepoSkill)).toBe(false);
+			expect(result.skills.some((r) => r.path === rootMarkdownSkill)).toBe(false);
+		});
+
+		it("should discover .agents/skills and .claude/skills side by side", async () => {
+			const agentsSkill = join(tempDir, ".agents", "skills", "agents-skill", "SKILL.md");
+			mkdirSync(join(tempDir, ".agents", "skills", "agents-skill"), { recursive: true });
+			writeFileSync(agentsSkill, "---\nname: agents-skill\ndescription: agents\n---\n");
+
+			const claudeSkill = join(tempDir, ".claude", "skills", "claude-skill", "SKILL.md");
+			mkdirSync(join(tempDir, ".claude", "skills", "claude-skill"), { recursive: true });
+			writeFileSync(claudeSkill, "---\nname: claude-skill\ndescription: claude\n---\n");
+
+			const result = await packageManager.resolve();
+			expect(result.skills.some((r) => r.path === agentsSkill && r.enabled)).toBe(true);
+			expect(result.skills.some((r) => r.path === claudeSkill && r.enabled)).toBe(true);
 		});
 	});
 

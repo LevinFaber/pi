@@ -99,11 +99,13 @@ Then just talk to pi. By default, pi gives the model four tools: `read`, `write`
 For each built-in provider, pi maintains a list of tool-capable models. Configured provider catalogs refresh automatically; run `pi update --models` to force an immediate refresh. Authenticate via subscription (`/login`) or API key, then select any model from that provider via `/model` (or Ctrl+L).
 
 **Subscriptions:**
+
 - Anthropic Claude Pro/Max
 - OpenAI ChatGPT Plus/Pro (Codex)
 - GitHub Copilot
 
 **API keys:**
+
 - Anthropic
 - Ant Ling
 - OpenAI
@@ -160,7 +162,7 @@ The editor can be temporarily replaced by other UI, like built-in `/settings` or
 ### Editor
 
 | Feature | How |
-|---------|-----|
+| --------- | ----- |
 | File reference | Type `@` to fuzzy-search project files |
 | Path completion | Tab to complete paths |
 | Multi-line | Shift+Enter (or Ctrl+Enter on Windows Terminal) |
@@ -175,7 +177,7 @@ Standard editing keybindings for delete word, undo, etc. See [docs/keybindings.m
 Type `/` in the editor to trigger commands. [Extensions](#extensions) can register custom commands, [skills](#skills) are available as `/skill:name`, and [prompt templates](#prompt-templates) expand via `/templatename`.
 
 | Command | Description |
-|---------|-------------|
+| --------- | ------------- |
 | `/login`, `/logout` | Manage provider credentials |
 | [`/llama`](docs/llama-cpp.md) | Download, load, and unload llama.cpp router models |
 | `/model` | Switch models |
@@ -206,7 +208,7 @@ See `/hotkeys` for the full list. Customize via `~/.pi/agent/keybindings.json`. 
 **Commonly used:**
 
 | Key | Action |
-|-----|--------|
+| ----- | -------- |
 | Ctrl+C | Clear editor |
 | Ctrl+C twice | Quit |
 | Escape | Cancel/abort |
@@ -294,7 +296,7 @@ See [docs/settings.md](docs/settings.md) for all options.
 
 ### Project Trust
 
-On interactive startup, pi asks before trusting a project folder that contains project-local settings, resources, or project `.agents/skills` and has no saved decision for the folder or a parent folder in `~/.pi/agent/trust.json`. Trusting a project allows pi to load `.pi/settings.json` and `.pi` resources, install missing project packages, and execute project extensions.
+On interactive startup, pi asks before trusting a project folder that contains project-local settings, resources, or project `.agents/skills` or `.claude/skills` and has no saved decision for the folder or a parent folder in `~/.pi/agent/trust.json`. Trusting a project allows pi to load `.pi/settings.json` and `.pi` resources, install missing project packages, and execute project extensions.
 
 Before the trust decision, pi loads only context files, user/global extensions, and CLI `-e` extensions so they can handle the `project_trust` event. Project-local extensions, project package-managed extensions, and project settings are loaded only after the project is trusted. This split also applies when switching to a session from a different cwd whose trust has not been resolved in the current process.
 
@@ -320,6 +322,7 @@ Use `--offline` or `PI_OFFLINE=1` to disable all startup network operations desc
 ## Context Files
 
 Pi loads `AGENTS.md` (or `CLAUDE.md`) at startup from:
+
 - `~/.pi/agent/AGENTS.md` (global)
 - Parent directories (walking up from cwd)
 - Current directory
@@ -364,7 +367,7 @@ Use this skill when the user asks about X.
 2. Then that
 ```
 
-Place in `~/.pi/agent/skills/`, `~/.agents/skills/`, `.pi/skills/`, or `.agents/skills/` (from `cwd` up through parent directories) or a [pi package](#pi-packages) to share with others. See [docs/skills.md](docs/skills.md).
+Place in `~/.pi/agent/skills/`, `~/.agents/skills/`, `~/.claude/skills/`, `.pi/skills/`, or `.agents/skills/`/`.claude/skills/` (from `cwd` up through parent directories) or a [pi package](#pi-packages) to share with others. See [docs/skills.md](docs/skills.md).
 
 ### Extensions
 
@@ -383,6 +386,7 @@ export default function (pi: ExtensionAPI) {
 The default export can also be `async`. pi waits for async extension factories before startup continues, which is useful for one-time initialization such as fetching remote model lists before calling `pi.registerProvider()`.
 
 **What's possible:**
+
 - Custom tools (or replace built-in tools entirely)
 - Sub-agents and plan mode
 - Custom compaction and summarization
@@ -539,7 +543,7 @@ pi config                    # Enable/disable package resources
 ### Modes
 
 | Flag | Description |
-|------|-------------|
+| ------ | ------------- |
 | (default) | Interactive mode |
 | `-p`, `--print` | Print response and exit |
 | `--mode json` | Output all events as JSON lines (see [docs/json.md](docs/json.md)) |
@@ -555,7 +559,7 @@ cat README.md | pi -p "Summarize this text"
 ### Model Options
 
 | Option | Description |
-|--------|-------------|
+| -------- | ------------- |
 | `--provider <name>` | Provider (anthropic, openai, google, etc.) |
 | `--model <pattern>` | Model pattern or ID (supports `provider/id` and optional `:<thinking>`) |
 | `--api-key <key>` | API key (overrides env vars) |
@@ -566,7 +570,7 @@ cat README.md | pi -p "Summarize this text"
 ### Session Options
 
 | Option | Description |
-|--------|-------------|
+| -------- | ------------- |
 | `-c`, `--continue` | Continue most recent session |
 | `-r`, `--resume` | Browse and select session |
 | `--session <path\|id>` | Use specific session file or partial UUID |
@@ -578,7 +582,7 @@ cat README.md | pi -p "Summarize this text"
 ### Tool Options
 
 | Option | Description |
-|--------|-------------|
+| -------- | ------------- |
 | `--tools <list>`, `-t <list>` | Allowlist specific tool names across built-in, extension, and custom tools |
 | `--exclude-tools <list>`, `-xt <list>` | Disable specific tool names across built-in, extension, and custom tools |
 | `--no-builtin-tools`, `-nbt` | Disable built-in tools by default but keep extension/custom tools enabled |
@@ -589,7 +593,7 @@ Available built-in tools: `read`, `bash`, `edit`, `write`, `grep`, `find`, `ls`
 ### Resource Options
 
 | Option | Description |
-|--------|-------------|
+| -------- | ------------- |
 | `-e`, `--extension <source>` | Load extension from path, npm, or git (repeatable) |
 | `--no-extensions` | Disable extension discovery |
 | `--skill <path>` | Load skill (repeatable) |
@@ -605,7 +609,7 @@ Combine `--no-*` with explicit flags to load exactly what you need, ignoring set
 ### Other Options
 
 | Option | Description |
-|--------|-------------|
+| -------- | ------------- |
 | `--system-prompt <text>` | Replace default prompt (context files and skills still appended) |
 | `--append-system-prompt <text>` | Append to system prompt |
 | `--tui-mode <mode>` | TUI mode: `regular` (default) or experimental `fullscreen` |
@@ -670,7 +674,7 @@ pi --thinking high "Solve this complex problem"
 ### Environment Variables
 
 | Variable | Description |
-|----------|-------------|
+| ---------- | ------------- |
 | `AI_AGENT` | Set to `pi` by the CLI and RPC entry points so generic tooling can attribute child processes to Pi |
 | `PI_CODING_AGENT` | Set to `true` by the CLI and RPC entry points so child processes can detect that they run inside Pi |
 | `PI_CODING_AGENT_DIR` | Override config directory (default: `~/.pi/agent`) |
@@ -685,7 +689,7 @@ pi --thinking high "Solve this complex problem"
 Commands run by the LLM-callable bash tool also receive current session metadata:
 
 | Variable | Description |
-|----------|-------------|
+| ---------- | ------------- |
 | `PI_SESSION_ID` | Current session ID |
 | `PI_SESSION_FILE` | Absolute session JSONL path; unset for ephemeral sessions |
 | `PI_PROVIDER` | Currently selected model provider |

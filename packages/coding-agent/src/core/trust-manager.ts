@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import lockfile from "proper-lockfile";
-import { CONFIG_DIR_NAME } from "../config.ts";
+import { CONFIG_DIR_NAME, resolveProjectRoot } from "../config.ts";
 import { canonicalizePath, resolvePath } from "../utils/paths.ts";
 import { stripBom } from "../utils/text.ts";
 
@@ -37,8 +37,14 @@ const TRUST_REQUIRING_PROJECT_CONFIG_RESOURCES = [
 	"APPEND_SYSTEM.md",
 ] as const;
 
+/**
+ * Normalize cwd to the directory that gates project trust. Resolves to the git
+ * worktree root when cwd has no local ${CONFIG_DIR_NAME} folder but the root does
+ * (see resolveProjectRoot), so trust decisions are read from, and saved to, that
+ * same resolved location regardless of which subdirectory pi runs from.
+ */
 function normalizeCwd(cwd: string): string {
-	return canonicalizePath(resolvePath(cwd));
+	return canonicalizePath(resolveProjectRoot(canonicalizePath(resolvePath(cwd))));
 }
 
 function findNearestTrustEntry(data: TrustFile, cwd: string): ProjectTrustStoreEntry | null {
@@ -177,25 +183,30 @@ function withTrustFileLock<T>(path: string, fn: () => T): T {
 
 /**
  * Returns true when cwd has project-local resources that must be gated by
- * project trust: trust-requiring entries under cwd/.pi, or .agents/skills in
- * cwd or one of its ancestors. Returns false when no such project resources
- * exist. The user/global ~/.agents/skills directory is always treated as a
- * trusted user resource and is ignored here, even when cwd is $HOME.
+ * project trust: trust-requiring entries under the resolved ${CONFIG_DIR_NAME}
+ * folder (cwd's own, or a git worktree root fallback; see resolveProjectRoot), or
+ * .agents/skills or .claude/skills in cwd or one of its ancestors. Returns false when no
+ * such project resources exist. The user/global ~/.agents/skills and ~/.claude/skills
+ * directories are always treated as trusted user resources and are ignored here, even
+ * when cwd is $HOME.
  */
 export function hasTrustRequiringProjectResources(cwd: string): boolean {
 	const homeDir = canonicalizePath(resolvePath(process.env.HOME || homedir()));
-	const userAgentsSkillsDir = join(homeDir, ".agents", "skills");
+	const agentDirNames = [".agents", ".claude"];
+	const userAgentSkillsDirs = agentDirNames.map((name) => join(homeDir, name, "skills"));
 	let currentDir = canonicalizePath(resolvePath(cwd));
 
-	const configDir = join(currentDir, CONFIG_DIR_NAME);
+	const configDir = join(resolveProjectRoot(currentDir), CONFIG_DIR_NAME);
 	if (TRUST_REQUIRING_PROJECT_CONFIG_RESOURCES.some((entry) => existsSync(join(configDir, entry)))) {
 		return true;
 	}
 
 	while (true) {
-		const agentsSkillsDir = join(currentDir, ".agents", "skills");
-		if (agentsSkillsDir !== userAgentsSkillsDir && existsSync(agentsSkillsDir)) {
-			return true;
+		for (let i = 0; i < agentDirNames.length; i++) {
+			const agentSkillsDir = join(currentDir, agentDirNames[i], "skills");
+			if (agentSkillsDir !== userAgentSkillsDirs[i] && existsSync(agentSkillsDir)) {
+				return true;
+			}
 		}
 
 		const parentDir = dirname(currentDir);

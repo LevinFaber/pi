@@ -124,7 +124,18 @@ Attribution:
 - Internal (from issues): `Fixed foo bar ([#123](https://github.com/earendil-works/pi-mono/issues/123))`
 - External contributions: `Added feature X ([#456](https://github.com/earendil-works/pi-mono/pull/456) by [@username](https://github.com/username))`
 
-## Releasing
+## Local Version Bumps (default)
+
+This instance is maintained for personal use and built from source, not installed from npm. Unless the user explicitly asks to release or publish, "bump version" means:
+
+1. `npm run version:patch` (or `version:minor`/`version:major`) — bumps all workspace packages lockstep, syncs versions, refreshes `package-lock.json`. Does not commit, tag, push, or publish.
+2. Add matching `## [Unreleased]` changelog entries per the Changelog section above. Do not rename `[Unreleased]` to a version header; that only happens on a real release (see below).
+3. `npm run build`, then link the built CLI (e.g. `npm link` from `packages/coding-agent`) so local usage picks up the change.
+4. Commit as directed by the user, following the Git section's staging rules. Lockfile changes need `PI_ALLOW_LOCKFILE_CHANGE=1` per the Dependency and Install Security section.
+
+The full public release process below (local smoke test, `release:patch`/`release:minor`, CI publish, pi.dev announcement) only runs on explicit request to release or publish.
+
+## Releasing (public release, on explicit request only)
 
 **Lockstep versioning**: all packages share one version; every release updates all together. `patch` = fixes + additions, `minor` = breaking changes. No major releases.
 

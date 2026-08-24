@@ -37,7 +37,7 @@ import type { Readable } from "node:stream";
 import ignore from "ignore";
 import { minimatch } from "minimatch";
 import { gt, maxSatisfying, rcompare, satisfies, valid, validRange } from "semver";
-import { CONFIG_DIR_NAME } from "../config.ts";
+import { CONFIG_DIR_NAME, resolveProjectRoot } from "../config.ts";
 import { spawnProcess, spawnProcessSync } from "../utils/child-process.ts";
 import { type GitSource, parseGitUrl } from "../utils/git.ts";
 import { canonicalizePath, isLocalPath, markPathIgnoredByCloudSync, resolvePath } from "../utils/paths.ts";
@@ -459,14 +459,14 @@ function findGitRepoRoot(startDir: string): string | null {
 	}
 }
 
-function collectAncestorAgentsSkillDirs(startDir: string): string[] {
+function collectAncestorSkillDirs(startDir: string, agentDirName: string): string[] {
 	const skillDirs: string[] = [];
 	const resolvedStartDir = resolve(startDir);
 	const gitRepoRoot = findGitRepoRoot(resolvedStartDir);
 
 	let dir = resolvedStartDir;
 	while (true) {
-		skillDirs.push(join(dir, ".agents", "skills"));
+		skillDirs.push(join(dir, agentDirName, "skills"));
 		if (gitRepoRoot && dir === gitRepoRoot) {
 			break;
 		}
@@ -805,6 +805,8 @@ function applyAutoloadDisabledPatterns(allPaths: string[], patterns: string[], b
 
 export class DefaultPackageManager implements PackageManager {
 	private cwd: string;
+	/** Directory whose ${CONFIG_DIR_NAME} folder backs project config; cwd itself, or a git worktree root fallback (see resolveProjectRoot). */
+	private projectConfigRoot: string;
 	private agentDir: string;
 	private settingsManager: SettingsManager;
 	private globalNpmRoot: string | undefined;
@@ -813,6 +815,7 @@ export class DefaultPackageManager implements PackageManager {
 
 	constructor(options: PackageManagerOptions) {
 		this.cwd = resolvePath(options.cwd);
+		this.projectConfigRoot = resolveProjectRoot(this.cwd);
 		this.agentDir = resolvePath(options.agentDir);
 		this.settingsManager = options.settingsManager;
 	}
@@ -928,7 +931,7 @@ export class DefaultPackageManager implements PackageManager {
 		await this.resolvePackageSources(packageSources, accumulator, onMissing);
 
 		const globalBaseDir = this.agentDir;
-		const projectBaseDir = join(this.cwd, CONFIG_DIR_NAME);
+		const projectBaseDir = join(this.projectConfigRoot, CONFIG_DIR_NAME);
 
 		for (const resourceType of RESOURCE_TYPES) {
 			const target = this.getTargetMap(accumulator, resourceType);
@@ -2028,7 +2031,7 @@ export class DefaultPackageManager implements PackageManager {
 		}
 		if (scope === "project") {
 			this.assertProjectTrustedForScope(scope);
-			return join(this.cwd, CONFIG_DIR_NAME, "npm");
+			return join(this.projectConfigRoot, CONFIG_DIR_NAME, "npm");
 		}
 		return join(this.agentDir, "npm");
 	}
@@ -2069,7 +2072,7 @@ export class DefaultPackageManager implements PackageManager {
 		}
 		if (scope === "project") {
 			this.assertProjectTrustedForScope(scope);
-			return join(this.cwd, CONFIG_DIR_NAME, "npm", "node_modules", source.name);
+			return join(this.projectConfigRoot, CONFIG_DIR_NAME, "npm", "node_modules", source.name);
 		}
 		return join(this.agentDir, "npm", "node_modules", source.name);
 	}
@@ -2108,7 +2111,7 @@ export class DefaultPackageManager implements PackageManager {
 		}
 		if (scope === "project") {
 			this.assertProjectTrustedForScope(scope);
-			return join(this.cwd, CONFIG_DIR_NAME, "git");
+			return join(this.projectConfigRoot, CONFIG_DIR_NAME, "git");
 		}
 		return join(this.agentDir, "git");
 	}
@@ -2134,7 +2137,7 @@ export class DefaultPackageManager implements PackageManager {
 	private getBaseDirForScope(scope: SourceScope): string {
 		if (scope === "project") {
 			this.assertProjectTrustedForScope(scope);
-			return join(this.cwd, CONFIG_DIR_NAME);
+			return join(this.projectConfigRoot, CONFIG_DIR_NAME);
 		}
 		if (scope === "user") {
 			return this.agentDir;
@@ -2394,10 +2397,18 @@ export class DefaultPackageManager implements PackageManager {
 			prompts: join(projectBaseDir, "prompts"),
 			themes: join(projectBaseDir, "themes"),
 		};
-		const userAgentsSkillsDir = join(getHomeDir(), ".agents", "skills");
 		const projectTrusted = this.settingsManager.isProjectTrusted();
-		const projectAgentsSkillDirs = projectTrusted
-			? collectAncestorAgentsSkillDirs(this.cwd).filter((dir) => resolve(dir) !== resolve(userAgentsSkillsDir))
+		// Third-party agent skill directories (".agents" is pi's own convention, shared with
+		// other harnesses; ".claude" is Claude Code's) discovered the same way: root .md files
+		// ignored, nested SKILL.md/*.md discovered, project dirs walked from cwd to repo root.
+		const agentSkillDirNames = [".agents", ".claude"];
+		const userAgentSkillsDirs = agentSkillDirNames.map((name) => join(getHomeDir(), name, "skills"));
+		const projectAgentSkillDirs = projectTrusted
+			? agentSkillDirNames.flatMap((name, i) =>
+					collectAncestorSkillDirs(this.cwd, name).filter(
+						(dir) => resolve(dir) !== resolve(userAgentSkillsDirs[i]),
+					),
+				)
 			: [];
 
 		const addResources = (
@@ -2434,19 +2445,19 @@ export class DefaultPackageManager implements PackageManager {
 			);
 		}
 
-		// Project skills from .agents/ (each with its own baseDir)
-		for (const agentsSkillsDir of projectAgentsSkillDirs) {
-			const agentsBaseDir = dirname(agentsSkillsDir); // the .agents directory
-			const agentsMetadata: PathMetadata = {
+		// Project skills from .agents/ and .claude/ (each with its own baseDir)
+		for (const agentSkillsDir of projectAgentSkillDirs) {
+			const agentBaseDir = dirname(agentSkillsDir); // the .agents or .claude directory
+			const agentMetadata: PathMetadata = {
 				...projectMetadata,
-				baseDir: agentsBaseDir,
+				baseDir: agentBaseDir,
 			};
 			addResources(
 				"skills",
-				collectAutoSkillEntries(agentsSkillsDir, "agents"),
-				agentsMetadata,
+				collectAutoSkillEntries(agentSkillsDir, "agents"),
+				agentMetadata,
 				projectOverrides.skills,
-				agentsBaseDir,
+				agentBaseDir,
 			);
 		}
 
@@ -2485,19 +2496,21 @@ export class DefaultPackageManager implements PackageManager {
 			globalBaseDir,
 		);
 
-		// User skills from ~/.agents/ (with its own baseDir)
-		const userAgentsBaseDir = dirname(userAgentsSkillsDir);
-		const userAgentsMetadata: PathMetadata = {
-			...userMetadata,
-			baseDir: userAgentsBaseDir,
-		};
-		addResources(
-			"skills",
-			collectAutoSkillEntries(userAgentsSkillsDir, "agents"),
-			userAgentsMetadata,
-			userOverrides.skills,
-			userAgentsBaseDir,
-		);
+		// User skills from ~/.agents/ and ~/.claude/ (each with its own baseDir)
+		for (const userAgentSkillsDir of userAgentSkillsDirs) {
+			const userAgentBaseDir = dirname(userAgentSkillsDir);
+			const userAgentMetadata: PathMetadata = {
+				...userMetadata,
+				baseDir: userAgentBaseDir,
+			};
+			addResources(
+				"skills",
+				collectAutoSkillEntries(userAgentSkillsDir, "agents"),
+				userAgentMetadata,
+				userOverrides.skills,
+				userAgentBaseDir,
+			);
+		}
 
 		addResources(
 			"prompts",
