@@ -44,7 +44,7 @@ const bashSchema = Type.Object({
 });
 
 export const bashToolSystemPromptContribution = {
-	snippet: "Execute bash commands (ls, grep, find, etc.)",
+	snippet: "Execute bash commands (ls, rg, fd, etc.)",
 	guidelines: ["You can inspect PI_* environment variables for current model and session details."],
 } as const;
 
