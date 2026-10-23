@@ -1,0 +1,22 @@
+# Speeds up `docker build` context loading for tools (e.g. moria) that COPY
+# this checkout wholesale. Everything here is either reinstalled/rebuilt
+# fresh inside the image (node_modules, dist) or never needed there (.git,
+# logs, coverage). Safe to delete; purely a build-context optimization,
+# except packages/ai/src/providers/data/ below — that one also avoids an
+# EXDEV crash in hydrate-model-data.ts (renaming a COPY'd-in host copy of
+# that gitignored dir hits a Docker Desktop containerd-snapshotter overlayfs
+# bug on cross-layer renames).
+.git/
+node_modules/
+packages/*/node_modules/
+dist/
+packages/*/dist/
+packages/*/dist-chrome/
+packages/*/dist-firefox/
+.artifacts/
+coverage/
+.nyc_output/
+*.log
+*.tsbuildinfo
+.DS_Store
+packages/ai/src/providers/data/
